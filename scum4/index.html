@@ -1,0 +1,231 @@
+<!-- frontend/index.html -->
+<!doctype html>
+<div id="app" class="container">
+  <!-- Auth -->
+  <div id="authPanel" class="panel" style="width:380px; display:none;">
+    <h2>SCUM Admin</h2>
+    <p class="badge" id="authSubtitle">Connexion</p>
+    <form id="authForm" class="grid" style="gap:12px">
+      <input class="input" id="email" type="email" placeholder="Email" required />
+      <input class="input" id="password" type="password" placeholder="Mot de passe" minlength="6" required />
+      <select class="input" id="roleSelect" style="display:none">
+        <option value="user">Utilisateur</option>
+        <option value="admin">Administrateur</option>
+      </select>
+      <div id="authError" class="error" style="display:none"></div>
+      <div class="row">
+        <button class="btn primary" type="submit" id="authSubmit">Se connecter</button>
+        <button class="btn" type="button" id="toggleMode">Créer un compte</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Dashboard -->
+  <div id="dashPanel" class="grid" style="gap:16px; max-width:1200px; width:100%; display:none;">
+    <div class="topbar">
+      <h2>Tableau de bord</h2>
+      <div class="userchip">
+        <span class="badge" id="userInfo">—</span>
+        <span class="sep">·</span>
+        <button class="btn" id="logoutBtn">Déconnexion</button>
+      </div>
+    </div>
+
+    <div class="grid cols-3">
+      <div class="panel kpi">
+        <span class="badge">Joueurs connectés</span>
+        <span class="kpi-value" id="playersCount">0</span>
+      </div>
+      <div class="panel kpi">
+        <span class="badge">Admins connectés</span>
+        <span class="kpi-value" id="adminsCount">0</span>
+      </div>
+      <div class="panel kpi">
+        <span class="badge">Véhicules listés</span>
+        <span class="kpi-value" id="vehiclesCount">0</span>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3 style="margin:0 0 8px 0">Véhicules</h3>
+      <div class="badge" style="margin-bottom:8px">Actualisation automatique toutes les 10s</div>
+      <div style="overflow:auto">
+        <table class="table" id="vehiclesTable">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Type</th>
+              <th>Propriétaire</th>
+              <th>État</th>
+              <th>Localisation (X, Y, Z)</th>
+            </tr>
+          </thead>
+          <tbody id="vehiclesBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // CONFIG: changer si besoin
+  const API_BASE = (window.SCUM_API_BASE) || 'http://localhost:4000/api'; // backend Express
+  const state = {
+    mode: 'login',
+    token: localStorage.getItem('token') || null,
+    user: JSON.parse(localStorage.getItem('user') || 'null'),
+  };
+
+  // Elements
+  const authPanel = document.getElementById('authPanel');
+  const dashPanel = document.getElementById('dashPanel');
+  const authSubtitle = document.getElementById('authSubtitle');
+  const authForm = document.getElementById('authForm');
+  const authSubmit = document.getElementById('authSubmit');
+  const toggleModeBtn = document.getElementById('toggleMode');
+  const emailEl = document.getElementById('email');
+  const passEl = document.getElementById('password');
+  const roleSelect = document.getElementById('roleSelect');
+  const authError = document.getElementById('authError');
+
+  const userInfo = document.getElementById('userInfo');
+  const logoutBtn = document.getElementById('logoutBtn');
+  const playersCount = document.getElementById('playersCount');
+  const adminsCount = document.getElementById('adminsCount');
+  const vehiclesCount = document.getElementById('vehiclesCount');
+  const vehiclesBody = document.getElementById('vehiclesBody');
+
+  // View toggle
+  function render() {
+    if (state.token) {
+      authPanel.style.display = 'none';
+      dashPanel.style.display = 'grid';
+      userInfo.textContent = (state.user?.email || 'inconnu') + ' · ' + (state.user?.role || 'user');
+      startAutoRefresh();
+    } else {
+      dashPanel.style.display = 'none';
+      authPanel.style.display = 'block';
+      stopAutoRefresh();
+    }
+  }
+
+  function setMode(mode) {
+    state.mode = mode;
+    if (mode === 'login') {
+      authSubtitle.textContent = 'Connexion';
+      authSubmit.textContent = 'Se connecter';
+      toggleModeBtn.textContent = 'Créer un compte';
+      roleSelect.style.display = 'none';
+    } else {
+      authSubtitle.textContent = 'Créer un compte';
+      authSubmit.textContent = 'Créer un compte';
+      toggleModeBtn.textContent = 'Déjà inscrit ?';
+      roleSelect.style.display = 'block';
+    }
+    authError.style.display = 'none';
+    authError.textContent = '';
+  }
+
+  toggleModeBtn.addEventListener('click', () => {
+    setMode(state.mode === 'login' ? 'register' : 'login');
+  });
+
+  authForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    authError.style.display = 'none';
+    const email = emailEl.value.trim();
+    const password = passEl.value;
+    const payload = state.mode === 'register'
+      ? { email, password, role: roleSelect.value }
+      : { email, password };
+    try {
+      const res = await fetch(`${API_BASE}/auth/${state.mode}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Erreur');
+      state.token = data.token; state.user = data.user;
+      localStorage.setItem('token', state.token);
+      localStorage.setItem('user', JSON.stringify(state.user));
+      render();
+      await refreshAll();
+    } catch (err) {
+      authError.textContent = err.message;
+      authError.style.display = 'block';
+    }
+  });
+
+  logoutBtn.addEventListener('click', () => {
+    state.token = null; state.user = null;
+    localStorage.removeItem('token'); localStorage.removeItem('user');
+    render();
+  });
+
+  async function apiGet(path) {
+    const res = await fetch(`${API_BASE}${path}`, {
+      headers: { 'Authorization': `Bearer ${state.token}` }
+    });
+    if (!res.ok) throw new Error('Requête échouée: ' + res.status);
+    return res.json();
+  }
+
+  function renderStatus(status) {
+    playersCount.textContent = status.connectedCount ?? 0;
+    adminsCount.textContent = status.adminConnectedCount ?? 0;
+  }
+
+  function renderVehicles(list) {
+    vehiclesCount.textContent = list.length;
+    vehiclesBody.innerHTML = '';
+    for (const v of list) {
+      const tr = document.createElement('tr');
+
+      const tdId = document.createElement('td'); tdId.textContent = v.id ?? '-';
+      const tdType = document.createElement('td'); tdType.textContent = v.type ?? '-';
+      const tdOwner = document.createElement('td'); tdOwner.textContent = v.owner ?? '-';
+
+      const tdState = document.createElement('td');
+      const health = typeof v.state === 'number' ? Math.round(v.state * 100) : null;
+      const pill = document.createElement('span');
+      pill.className = 'pill ' + (health !== null ? (health >= 60 ? 'ok' : 'warn') : '');
+      pill.textContent = health !== null ? health + '%' : (v.state ?? '-');
+      tdState.appendChild(pill);
+
+      const tdLoc = document.createElement('td');
+      const x = v.location?.x, y = v.location?.y, z = v.location?.z;
+      tdLoc.textContent = [x,y,z].filter(n => n !== null && n !== undefined).join(', ') || '-';
+
+      tr.append(tdId, tdType, tdOwner, tdState, tdLoc);
+      vehiclesBody.appendChild(tr);
+    }
+  }
+
+  let intervalId = null;
+  async function refreshAll() {
+    try {
+      const [status, vehicles] = await Promise.all([
+        apiGet('/status'),
+        apiGet('/vehicles')
+      ]);
+      renderStatus(status);
+      renderVehicles(vehicles.vehicles || []);
+    } catch (e) {
+      console.warn('Refresh error:', e.message);
+    }
+  }
+  function startAutoRefresh() {
+    if (intervalId) return;
+    refreshAll();
+    intervalId = setInterval(refreshAll, 10000);
+  }
+  function stopAutoRefresh() {
+    if (!intervalId) return;
+    clearInterval(intervalId);
+    intervalId = null;
+  }
+
+  setMode(state.mode);
+  render();
+</script>

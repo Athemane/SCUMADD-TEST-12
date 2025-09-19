@@ -1,0 +1,129 @@
+/* frontend/src/styles.css - thème sombre minimal + lightning subtle */
+:root {
+  --bg: #0b0e12;
+  --panel: #12161c;
+  --text: #e6eef8;
+  --muted: #95a3b3;
+  --accent: #4dd2ff;
+  --success: #37d67a;
+  --warning: #ffd166;
+}
+
+html, body, #root {
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  margin: 0;
+}
+
+.app-bg {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  z-index: -1;
+  background: radial-gradient(1000px 600px at 20% 10%, rgba(77,210,255,0.06), transparent 60%),
+              radial-gradient(800px 500px at 80% 30%, rgba(77,210,255,0.05), transparent 60%),
+              linear-gradient(180deg, #06080b, #0b0e12 50%, #0b0e12);
+}
+
+/* Lightning painting: lignes électriques subtiles via box-shadow animés */
+.lightning-layer {
+  position: absolute;
+  inset: 0;
+  filter: blur(0.5px) contrast(120%);
+  pointer-events: none;
+}
+
+.lightning-bolt {
+  position: absolute;
+  width: 1px;
+  height: 0;
+  left: 50%;
+  top: 10%;
+  background: linear-gradient(180deg, rgba(77,210,255,0.9), rgba(77,210,255,0));
+  box-shadow:
+    0 0 6px rgba(77,210,255,0.8),
+    0 0 12px rgba(77,210,255,0.5),
+    0 0 24px rgba(77,210,255,0.25);
+  opacity: 0;
+  animation: flicker 6s infinite ease-in-out, strike 6s infinite ease-in-out;
+}
+
+.lightning-bolt:nth-child(2){ left: 20%; animation-delay: 1.2s, 1.2s; }
+.lightning-bolt:nth-child(3){ left: 75%; animation-delay: 2.8s, 2.8s; }
+.lightning-bolt:nth-child(4){ left: 35%; animation-delay: 4.1s, 4.1s; }
+
+@keyframes flicker {
+  0%, 100% { opacity: 0; }
+  8%       { opacity: 0.9; }
+  10%      { opacity: 0.2; }
+  12%      { opacity: 0.8; }
+  15%      { opacity: 0; }
+  50%      { opacity: 0; }
+}
+
+@keyframes strike {
+  0%, 50% { height: 0; transform: translateY(0); }
+  8%      { height: 38vh; transform: translateY(0); }
+  10%     { height: 52vh; transform: translateY(0); }
+  12%     { height: 0; transform: translateY(52vh); }
+  100%    { height: 0; transform: translateY(52vh); }
+}
+
+/* Panels */
+.panel {
+  background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0));
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 14px;
+  padding: 16px 18px;
+  backdrop-filter: blur(6px);
+}
+
+.grid {
+  display: grid;
+  gap: 16px;
+}
+
+.grid.cols-3 {
+  grid-template-columns: repeat(3, minmax(0,1fr));
+}
+@media (max-width: 900px) {
+  .grid.cols-3 { grid-template-columns: 1fr; }
+}
+
+.kpi {
+  display: flex; align-items: center; justify-content: space-between;
+}
+
+.badge { color: var(--muted); font-size: 13px; }
+.kpi-value { font-size: 28px; font-weight: 700; }
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.table th, .table td {
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  padding: 10px;
+}
+.table th { color: var(--muted); font-weight: 500; text-align: left; }
+
+.btn {
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid rgba(255,255,255,0.08);
+  padding: 10px 14px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+.btn.primary { background: linear-gradient(180deg, #12a9e0, #0e7fb1); border: none; }
+.input {
+  width: 100%;
+  background: #0f1319;
+  color: var(--text);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
